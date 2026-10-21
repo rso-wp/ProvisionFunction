@@ -8,11 +8,14 @@ namespace Function.Features.Provision;
 public class ProvisionSiteFunction(
     ProvisionTenantSiteHandler handler,
     ProvisioningEventPublisher events,
+    CommandRetries retries,
     ILogger<ProvisionSiteFunction> logger)
 {
     /// <summary>
-    /// A failure throws, so the queue redelivers the command after the visibility timeout (host.json). The last attempt
-    /// reports <see cref="ProvisioningEventTypes.ProvisioningFailed"/> instead, so the site shows as Failed.
+    /// A failure queues the command again with a growing delay (<see cref="CommandRetries"/>). After
+    /// <see cref="ProvisioningQueues.MaxAttempts"/> attempts it reports <see cref="ProvisioningEventTypes.ProvisioningFailed"/>
+    /// (the site shows as Failed); ProvisioningService keeps sending the command now and then, and a site that comes up
+    /// later shows as running. Only a crash or a failure to queue the retry throws (host.json then retries the message).
     /// </summary>
     [Function("ProvisionSite")]
     public async Task Run(
@@ -27,10 +30,19 @@ public class ProvisionSiteFunction(
                 new ProvisioningEvent(ProvisioningEventTypes.Provisioned, command.ProvisionId, command.Tenant, command.Name, Url: url),
                 ct);
         }
-        catch (Exception ex) when (message.DequeueCount >= ProvisioningQueues.MaxAttempts && !ct.IsCancellationRequested)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            logger.LogError(ex, "Provisioning {ProvisionId} failed permanently after {Attempts} attempts",
-                command.ProvisionId, message.DequeueCount);
+            var failures = command.Attempt + 1;
+            if (failures < ProvisioningQueues.MaxAttempts)
+            {
+                logger.LogWarning(ex, "Provisioning {ProvisionId} failed (attempt {Attempt} of {Max}), retrying in {Delay}",
+                    command.ProvisionId, failures, ProvisioningQueues.MaxAttempts, CommandRetries.Delay(failures));
+                await retries.ScheduleAsync(ProvisioningQueues.Provision, command with { Attempt = failures }, failures, ct);
+                return;
+            }
+
+            logger.LogError(ex, "Provisioning {ProvisionId} failed {Attempts} times; reporting it as failed",
+                command.ProvisionId, failures);
             await events.PublishAsync(
                 new ProvisioningEvent(ProvisioningEventTypes.ProvisioningFailed, command.ProvisionId, command.Tenant, command.Name,
                     Reason: ex.Message),

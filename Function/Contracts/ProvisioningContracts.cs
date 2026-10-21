@@ -18,14 +18,26 @@ public static class ProvisioningQueues
     // ProvisionFunction -> ProvisioningService
     public const string Events = "provisioning-events";
 
-    /// <summary>Attempts per command; the same value as <c>maxDequeueCount</c> in host.json.</summary>
-    public const int MaxAttempts = 5;
+    /// <summary>Events that cannot be read (not valid JSON) are moved here by ProvisioningService, for inspection.</summary>
+    public const string EventsPoison = "provisioning-events-poison";
+
+    /// <summary>
+    /// Attempts ProvisionFunction makes at one command, with growing delays in between (about 45 minutes in all). After the
+    /// last one a provision reports provisioning-failed and a deprovision gives up; ProvisioningService sends the command
+    /// again an hour later, for as long as the site has not reached its end state (ProvisioningReconciler).
+    /// </summary>
+    public const int MaxAttempts = 8;
+
+    /// <summary>Time to live of every message: they never expire (the default is 7 days).</summary>
+    public static readonly TimeSpan Forever = TimeSpan.FromSeconds(-1);
 }
 
 /// <summary>Start the site <c>Name.Tenant.&lt;domain&gt;</c>; <see cref="Host"/> is that full host name.</summary>
-public record ProvisionTenantSite(Guid ProvisionId, string Tenant, string Name, string Host);
+/// <param name="Attempt">Failed attempts so far: 0 from ProvisioningService, counted up by ProvisionFunction when it retries.</param>
+public record ProvisionTenantSite(Guid ProvisionId, string Tenant, string Name, string Host, int Attempt = 0);
 
-public record DeprovisionTenantSite(Guid ProvisionId, string Tenant, string Name);
+/// <param name="Attempt">Failed attempts so far: 0 from ProvisioningService, counted up by ProvisionFunction when it retries.</param>
+public record DeprovisionTenantSite(Guid ProvisionId, string Tenant, string Name, int Attempt = 0);
 
 public static class ProvisioningEventTypes
 {
