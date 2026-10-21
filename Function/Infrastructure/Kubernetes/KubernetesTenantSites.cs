@@ -306,7 +306,8 @@ public class KubernetesTenantSites(IKubernetes k8s, IOptions<KubernetesOptions> 
         ["app.kubernetes.io/instance"] = site.ResourceName,
         ["app.kubernetes.io/managed-by"] = FieldManager,
         ["rso.tenant"] = site.Tenant,
-        ["rso.site"] = site.Name
+        ["rso.site"] = site.Name,
+        ["rso.provision-id"] = site.ProvisionId.ToString()
     };
 
     private static V1ObjectMeta Meta(string name, string ns, IDictionary<string, string> labels) =>

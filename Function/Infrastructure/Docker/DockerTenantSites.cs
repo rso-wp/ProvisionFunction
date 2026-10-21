@@ -52,7 +52,10 @@ public class DockerTenantSites(DockerClient docker, IOptions<DockerOptions> opti
                 // The published port is chosen by docker, so derive the site URL from the request instead of storing it.
                 $"WORDPRESS_CONFIG_EXTRA={WordPressConfig.Extra("'http://' . $_SERVER['HTTP_HOST']", database.UseTls)}"
             ],
-            Labels = new Dictionary<string, string> { ["rso.tenant"] = site.Tenant, ["rso.site"] = site.Name },
+            Labels = new Dictionary<string, string>
+            {
+                ["rso.tenant"] = site.Tenant, ["rso.site"] = site.Name, ["rso.provision-id"] = site.ProvisionId.ToString()
+            },
             ExposedPorts = new Dictionary<string, EmptyStruct> { [HttpPort] = default },
             // WordPress needs a few seconds after the container starts (it copies its files on first boot). The site is
             // only reported as provisioned once it answers HTTP.

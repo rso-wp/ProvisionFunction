@@ -9,7 +9,7 @@ public class DeprovisionTenantSiteHandler(ITenantDatabases databases, ITenantSit
     /// <summary>Removes the site (and its storage) first, then drops the database and its user. Idempotent.</summary>
     public async Task HandleAsync(DeprovisionTenantSite command, CancellationToken ct)
     {
-        var site = new SiteKey(command.Tenant, command.Name);
+        var site = new SiteKey(command.ProvisionId, command.Tenant, command.Name);
         logger.LogInformation("Deprovisioning {Site} ({ProvisionId})", site, command.ProvisionId);
 
         await sites.RemoveAsync(site, ct);

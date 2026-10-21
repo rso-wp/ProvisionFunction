@@ -9,7 +9,7 @@ public class ProvisionTenantSiteHandler(ITenantDatabases databases, ITenantSites
     /// <summary>Creates the site's database first, then the WordPress site connected to it. Returns the site URL.</summary>
     public async Task<string> HandleAsync(ProvisionTenantSite command, CancellationToken ct)
     {
-        var site = new SiteKey(command.Tenant, command.Name);
+        var site = new SiteKey(command.ProvisionId, command.Tenant, command.Name);
         logger.LogInformation("Provisioning {Site} ({ProvisionId})", command.Host, command.ProvisionId);
 
         var database = await databases.CreateAsync(site, ct);
