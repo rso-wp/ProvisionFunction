@@ -1,6 +1,9 @@
 using Docker.DotNet;
 using Function.Infrastructure.Docker;
+using Function.Infrastructure.Kubernetes;
 using Function.Infrastructure.MySql;
+using Function.Infrastructure.Sites;
+using Microsoft.Extensions.Options;
 
 namespace Function.Infrastructure;
 
@@ -18,10 +21,23 @@ public static class InfrastructureExtensions
         return services;
     }
 
+    /// <summary><c>Sites:Backend</c>: <c>Docker</c> (default, local development) or <c>Kubernetes</c> (AKS).</summary>
     public static IServiceCollection AddTenantSites(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<DockerOptions>().Bind(configuration.GetSection(DockerOptions.SectionName));
+        var backend = configuration["Sites:Backend"] is { Length: > 0 } value ? value : "Docker";
 
+        if (backend.Equals("Kubernetes", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddOptions<KubernetesOptions>().Bind(configuration.GetSection(KubernetesOptions.SectionName));
+            services.AddSingleton(sp => KubernetesOptions.CreateClient(sp.GetRequiredService<IOptions<KubernetesOptions>>().Value));
+            services.AddSingleton<ITenantSites, KubernetesTenantSites>();
+            return services;
+        }
+
+        if (!backend.Equals("Docker", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Unknown 'Sites:Backend' '{backend}' (Docker or Kubernetes).");
+
+        services.AddOptions<DockerOptions>().Bind(configuration.GetSection(DockerOptions.SectionName));
         services.AddSingleton(_ =>
         {
             var endpoint = configuration[$"{DockerOptions.SectionName}:Endpoint"];

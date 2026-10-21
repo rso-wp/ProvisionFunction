@@ -3,6 +3,7 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using Function.Features;
 using Function.Infrastructure.MySql;
+using Function.Infrastructure.Sites;
 using Microsoft.Extensions.Options;
 
 namespace Function.Infrastructure.Docker;
@@ -24,21 +25,13 @@ public class DockerOptions
     public string PublicHost { get; set; } = "localhost";
 }
 
-public interface ITenantSites
-{
-    /// <summary>(Re)creates and starts the site's WordPress container. Returns the site URL.</summary>
-    Task<string> StartAsync(SiteKey site, TenantDatabase database, CancellationToken ct);
-
-    /// <summary>Removes the site's container and its volume. Missing ones are ignored.</summary>
-    Task RemoveAsync(SiteKey site, CancellationToken ct);
-}
-
+/// <summary>Sites as containers on a local docker (Sites:Backend = Docker, local development).</summary>
 public class DockerTenantSites(DockerClient docker, IOptions<DockerOptions> options, ILogger<DockerTenantSites> logger)
     : ITenantSites
 {
     private const string HttpPort = "80/tcp";
 
-    public async Task<string> StartAsync(SiteKey site, TenantDatabase database, CancellationToken ct)
+    public async Task<string> StartAsync(SiteKey site, string host, TenantDatabase database, CancellationToken ct)
     {
         var o = options.Value;
         var name = site.Container;
@@ -57,7 +50,7 @@ public class DockerTenantSites(DockerClient docker, IOptions<DockerOptions> opti
                 $"WORDPRESS_DB_USER={database.User}",
                 $"WORDPRESS_DB_PASSWORD={database.Password}",
                 // The published port is chosen by docker, so derive the site URL from the request instead of storing it.
-                "WORDPRESS_CONFIG_EXTRA=define('WP_HOME', 'http://' . $_SERVER['HTTP_HOST']); define('WP_SITEURL', WP_HOME);"
+                $"WORDPRESS_CONFIG_EXTRA={WordPressConfig.Extra("'http://' . $_SERVER['HTTP_HOST']", database.UseTls)}"
             ],
             Labels = new Dictionary<string, string> { ["rso.tenant"] = site.Tenant, ["rso.site"] = site.Name },
             ExposedPorts = new Dictionary<string, EmptyStruct> { [HttpPort] = default },
