@@ -1,15 +1,15 @@
 using Function.Features.Deprovision;
 using Function.Features.Provision;
 using Function.Infrastructure;
-using Function.Infrastructure.Nats;
+using Function.Infrastructure.Queues;
+using Microsoft.Azure.Functions.Worker.Builder;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = FunctionsApplication.CreateBuilder(args);
 
-builder.Services.AddNats(builder.Configuration);
+builder.Services.AddProvisioningQueues(builder.Configuration);
 builder.Services.AddTenantDatabases(builder.Configuration);
 builder.Services.AddTenantSites(builder.Configuration);
 builder.Services.AddSingleton<ProvisionTenantSiteHandler>();
 builder.Services.AddSingleton<DeprovisionTenantSiteHandler>();
-builder.Services.AddHostedService<CommandConsumer>();
 
 await builder.Build().RunAsync();

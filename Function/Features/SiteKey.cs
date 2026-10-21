@@ -6,7 +6,7 @@ namespace Function.Features;
 
 /// <summary>
 /// One WordPress site, <c>Name.Tenant.&lt;domain&gt;</c>, and the names of everything created for it. Both parts are
-/// re-validated here because they end up in SQL identifiers and docker object names; ProvisioningService and UserService
+/// re-validated here because they end up in SQL identifiers and docker / Kubernetes object names; ProvisioningService and UserService
 /// apply the same DNS-label rule.
 /// </summary>
 public partial record SiteKey
@@ -33,6 +33,12 @@ public partial record SiteKey
     public string Database => $"wp_{Hash}";
 
     public string DatabaseUser => $"u_{Hash}";
+
+    /// <summary>
+    /// Kubernetes objects (Secret, PVC, Deployment, Service, Ingress): a DNS label, so no "."; joining the parts with "-"
+    /// could collide ("a-b"+"c" vs "a"+"b-c"), so it is the hash too. The tenant and site are in the labels.
+    /// </summary>
+    public string ResourceName => $"wp-{Hash}";
 
     private string Hash => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{Name}.{Tenant}")))[..20];
 

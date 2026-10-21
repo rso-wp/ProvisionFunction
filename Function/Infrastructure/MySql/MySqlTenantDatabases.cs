@@ -12,11 +12,14 @@ public class MySqlOptions
     /// <summary>Connection used by this worker to create/drop tenant databases (needs CREATE USER and GRANT).</summary>
     public string AdminConnectionString { get; set; } = "";
 
-    /// <summary>MySQL host:port as seen from the WordPress containers (docker network), e.g. rso-mysql:3306.</summary>
+    /// <summary>MySQL host:port as seen from the WordPress sites, e.g. rso-mysql:3306 (docker network).</summary>
     public string HostForSites { get; set; } = "";
+
+    /// <summary>The sites must connect over TLS (Azure Database for MySQL requires it).</summary>
+    public bool SitesUseTls { get; set; }
 }
 
-public record TenantDatabase(string Host, string Name, string User, string Password);
+public record TenantDatabase(string Host, string Name, string User, string Password, bool UseTls);
 
 public interface ITenantDatabases
 {
@@ -44,7 +47,7 @@ public class MySqlTenantDatabases(IOptions<MySqlOptions> options, ILogger<MySqlT
         await ExecuteAsync(connection, $"GRANT ALL PRIVILEGES ON `{database}`.* TO '{user}'@'%'", ct);
 
         logger.LogInformation("Database {Database} with user {User} ready", database, user);
-        return new TenantDatabase(options.Value.HostForSites, database, user, password);
+        return new TenantDatabase(options.Value.HostForSites, database, user, password, options.Value.SitesUseTls);
     }
 
     public async Task DropAsync(SiteKey site, CancellationToken ct)

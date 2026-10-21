@@ -1,23 +1,25 @@
 namespace Function.Contracts;
 
 // Wire contract shared with ProvisioningService (copy in ProvisioningService/Api/Infrastructure/Messaging).
-// Keep both copies in sync. Payloads are JSON (camelCase) on NATS JetStream stream PROVISIONING.
+// Keep both copies in sync. Messages are plain JSON (camelCase, not base64) on Azure Storage Queues.
 
-public static class ProvisioningSubjects
+public static class ProvisioningQueues
 {
-    public const string Stream = "PROVISIONING";
-    public const string All = "provisioning.>";
+    /// <summary>
+    /// Setting with the queues' storage account: a connection string, or <c>ProvisioningQueues__queueServiceUri</c> for a
+    /// managed identity.
+    /// </summary>
+    public const string Connection = "ProvisioningQueues";
 
     // ProvisioningService -> ProvisionFunction
-    public const string Commands = "provisioning.commands.>";
-    public const string Provision = "provisioning.commands.provision";
-    public const string Deprovision = "provisioning.commands.deprovision";
+    public const string Provision = "provision-site";
+    public const string Deprovision = "deprovision-site";
 
     // ProvisionFunction -> ProvisioningService
-    public const string Events = "provisioning.events.>";
-    public const string Provisioned = "provisioning.events.provisioned";
-    public const string ProvisioningFailed = "provisioning.events.provisioning-failed";
-    public const string Destroyed = "provisioning.events.destroyed";
+    public const string Events = "provisioning-events";
+
+    /// <summary>Attempts per command; the same value as <c>maxDequeueCount</c> in host.json.</summary>
+    public const int MaxAttempts = 5;
 }
 
 /// <summary>Start the site <c>Name.Tenant.&lt;domain&gt;</c>; <see cref="Host"/> is that full host name.</summary>
@@ -25,8 +27,15 @@ public record ProvisionTenantSite(Guid ProvisionId, string Tenant, string Name, 
 
 public record DeprovisionTenantSite(Guid ProvisionId, string Tenant, string Name);
 
-public record TenantSiteProvisioned(Guid ProvisionId, string Url);
+public static class ProvisioningEventTypes
+{
+    public const string Provisioned = "provisioned";
+    public const string ProvisioningFailed = "provisioning-failed";
+    public const string Destroyed = "destroyed";
+}
 
-public record TenantSiteProvisioningFailed(Guid ProvisionId, string Reason);
-
-public record TenantSiteDestroyed(Guid ProvisionId);
+/// <summary>
+/// Result of a command (<see cref="ProvisioningEventTypes"/>). Carries the site, so ProvisioningService can clean up a site
+/// whose row was deleted while it was being created (the queues do not keep commands in order).
+/// </summary>
+public record ProvisioningEvent(string Type, Guid ProvisionId, string Tenant, string Name, string? Url = null, string? Reason = null);
