@@ -1,14 +1,12 @@
-name: Build
+name: Test
 
-# There are no tests yet, so this only checks that the function compiles. Add a test project and a
-# `dotnet test` step here when there is one.
 on:
   push:
     branches: [main, master]
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +16,14 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore Function/Function.csproj
+        run: dotnet restore Tests/Tests.csproj
 
-      - name: Build
-        run: dotnet build Function/Function.csproj --no-restore --configuration Release
+      - name: Test
+        run: dotnet test Tests/Tests.csproj --no-restore --configuration Release --logger "trx;LogFileName=results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/TestResults/*.trx"
